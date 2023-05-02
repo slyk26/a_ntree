@@ -1,0 +1,16 @@
+[package]
+name = "a_ntree"
+version = "0.1.0"
+edition = "2021"
+authors = ["slyk26"]
+description = "A generic NTree with unique Values"
+keywords = ["datatype", "datastructure", "tree", "node", "generic"]
+categories = ["data-structures"]
+license = "MIT"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+[profile.release]
+strip = "symbols"
