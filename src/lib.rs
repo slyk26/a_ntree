@@ -1,4 +1,4 @@
-#[doc = include_str!("../README.md")]
+#![doc = include_str!("../README.md")]
 
 use std::rc::{Rc, Weak};
 use std::cell::{RefCell};
@@ -6,24 +6,26 @@ use std::fmt::Debug;
 
 #[derive(Debug)]
 /// a singular Node that holds a generic value
-pub struct Node<T> where T: PartialEq + Debug {
+pub struct Node<T> where T: PartialEq {
     pointer: Rc<RawNode<T>>,
 }
 
-impl<T> PartialEq for Node<T> where T: PartialEq + Debug {
+impl<T> PartialEq for Node<T> where T: PartialEq {
     fn eq(&self, other: &Self) -> bool {
         Rc::ptr_eq(&self.pointer, &other.pointer)
     }
 }
 
 #[allow(unused)]
-impl<T> Node<T> where T: PartialEq + Debug {
+impl<T> Node<T> where T: PartialEq {
     /// creates a new [Node] with a value
     /// ## Example
     /// ```
     /// use a_ntree::Node;
     /// let node = Node::new(10);
-    /// let another_node = Node::new("Burger");
+    /// let another_node = Node::new(10);
+    ///
+    /// assert_ne!(node, another_node);
     /// ```
     pub fn new(value: T) -> Self {
         Node { pointer: Rc::new(RawNode::new(value)) }
@@ -48,7 +50,7 @@ impl<T> Node<T> where T: PartialEq + Debug {
 
     /// returns the parent of a [Node],
     ///
-    /// if the [Node] is the root, the Parent is [None]
+    /// if the Node is the root, the Parent is [None]
     /// ## Example
     /// ```
     /// use a_ntree::Node;
@@ -74,7 +76,8 @@ impl<T> Node<T> where T: PartialEq + Debug {
     /// let child = Node::new(30);
     /// root.add_child(&child);
     ///
-    /// assert_eq!(root.children().get(0).unwrap(), &child)
+    /// assert_eq!(root.children().get(0).unwrap(), &child);
+    /// assert_eq!(child.parent().unwrap(), root);
     pub fn children(&self) -> Vec<Node<T>> {
         let mut ret: Vec<Node<T>> = vec![];
 
@@ -101,7 +104,7 @@ impl<T> Node<T> where T: PartialEq + Debug {
 
     /// adds a value directly as a child to a [Node]
     ///
-    /// same as [Node::add_child()] but without the need to create a new [Node]
+    /// same as [Node::add_child()] but without the need to create a new Node
     /// ## Example
     /// ```
     /// use a_ntree::Node;
@@ -114,9 +117,9 @@ impl<T> Node<T> where T: PartialEq + Debug {
         self.add_child(&Node::new(leaf));
     }
 
-    /// searches a [Node] by value - starting from the calling [Node] inclusive
+    /// searches a [Node] by value - starting from the calling Node inclusive
     ///
-    /// returns [None] if Node doesnt exist
+    /// returns the first Node found or [None] if the value doesnt exist
     /// ## Example
     /// ```
     /// use a_ntree::Node;
@@ -136,7 +139,7 @@ impl<T> Node<T> where T: PartialEq + Debug {
         None
     }
 
-    /// removes a child [Node] from this [Node]
+    /// removes a child [Node] from this Node
     /// ## Example
     /// ```
     /// use a_ntree::Node;
@@ -153,17 +156,35 @@ impl<T> Node<T> where T: PartialEq + Debug {
     pub fn remove_node(&self, value: &T) {
         self.pointer.remove_node(value);
     }
+
+    /// get the root [Node]
+    ///
+    /// if this Node has no parents, this Node is the root Node
+    /// ## Example
+    /// ```
+    /// use a_ntree::Node;
+    /// let root = Node::new(10);
+    /// let a_child = Node::new(20);
+    /// let child_of_child = Node::new(30);
+    /// root.add_child(&a_child);
+    /// a_child.add_child(&child_of_child);
+    ///
+    /// assert_eq!(child_of_child.get_root(), root);
+    /// ```
+    pub fn get_root(&self) -> Node<T> {
+        Node::from(&self.pointer.get_root())
+    }
 }
 
 #[derive(Debug)]
-struct RawNode<T> where T: PartialEq + Debug {
+struct RawNode<T> where T: PartialEq {
     value: T,
     parent: RefCell<Weak<RawNode<T>>>,
     children: RefCell<Vec<Rc<RawNode<T>>>>,
 }
 
 #[allow(unused)]
-impl<T> RawNode<T> where T: PartialEq + Debug {
+impl<T> RawNode<T> where T: PartialEq {
     fn new(value: T) -> Self {
         RawNode { value, parent: RefCell::new(Weak::new()), children: RefCell::new(vec![]) }
     }
@@ -201,5 +222,15 @@ impl<T> RawNode<T> where T: PartialEq + Debug {
                 vec.remove(idx);
             }
         }
+    }
+
+    fn get_root(self: &Rc<Self>) -> Rc<RawNode<T>> {
+        let mut ret;
+        if self.parent().is_none() {
+            ret = self.clone()
+        } else {
+            ret = RawNode::get_root(&self.parent.borrow().upgrade().unwrap());
+        }
+        ret
     }
 }
