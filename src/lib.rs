@@ -1,42 +1,23 @@
-//! This crate implements a simple generic Tree datatype with Nodes.
-//! # Limitations
-//! This datatype has the following limitations:
-//! * Each Value inside a [Node] is unique
-//! * A [Node] cannot have children of different types
-//! # Example
-//! ```
-//!  use a_ntree::Node;
-//!  let root = Node::new(10);
-//!  let a_child = Node::new(20);
-//!
-//!  root.add_child(&a_child);
-//!  a_child.add_leaf(999);
-//!  root.add_leaf(30);
-//!
-//!     //        Node(10)
-//!     //        /     \
-//!     //    Node(20) Node(30)
-//!     //      /
-//!     //  Node(999)
-//! ```
+#[doc = include_str!("../README.md")]
 
 use std::rc::{Rc, Weak};
 use std::cell::{RefCell};
+use std::fmt::Debug;
 
 #[derive(Debug)]
 /// a singular Node that holds a generic value
-pub struct Node<T> where T: PartialEq {
+pub struct Node<T> where T: PartialEq + Debug {
     pointer: Rc<RawNode<T>>,
 }
 
-impl<T> PartialEq for Node<T> where T: PartialEq {
+impl<T> PartialEq for Node<T> where T: PartialEq + Debug {
     fn eq(&self, other: &Self) -> bool {
         Rc::ptr_eq(&self.pointer, &other.pointer)
     }
 }
 
 #[allow(unused)]
-impl<T> Node<T> where T: PartialEq {
+impl<T> Node<T> where T: PartialEq + Debug {
     /// creates a new [Node] with a value
     /// ## Example
     /// ```
@@ -155,20 +136,34 @@ impl<T> Node<T> where T: PartialEq {
         None
     }
 
+    /// removes a child [Node] from this [Node]
+    /// ## Example
+    /// ```
+    /// use a_ntree::Node;
+    ///
+    /// let root = Node::new(10);
+    /// root.add_leaf(30);
+    /// root.add_leaf(40);
+    /// // root has 2 children
+    /// root.remove_node(&40);
+    /// // root has 1 child
+    /// assert_eq!(root.children().len(), 1);
+    /// assert!(root.find(&40).is_none());
+    /// ```
     pub fn remove_node(&self, value: &T) {
         self.pointer.remove_node(value);
     }
 }
 
 #[derive(Debug)]
-struct RawNode<T> where T: PartialEq {
+struct RawNode<T> where T: PartialEq + Debug {
     value: T,
     parent: RefCell<Weak<RawNode<T>>>,
     children: RefCell<Vec<Rc<RawNode<T>>>>,
 }
 
 #[allow(unused)]
-impl<T> RawNode<T> where T: PartialEq {
+impl<T> RawNode<T> where T: PartialEq + Debug {
     fn new(value: T) -> Self {
         RawNode { value, parent: RefCell::new(Weak::new()), children: RefCell::new(vec![]) }
     }
@@ -194,11 +189,7 @@ impl<T> RawNode<T> where T: PartialEq {
         if self.value() == value {
             Some(self.clone())
         } else {
-            let mut ret = None;
-            for i in 0..self.children.borrow().len() {
-                ret = RawNode::find(self.children().borrow().get(i).unwrap(), value);
-            }
-            ret
+            self.children.borrow().iter().find_map(|node| RawNode::find(node, value))
         }
     }
 
