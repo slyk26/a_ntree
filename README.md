@@ -3,8 +3,9 @@ Simple Tree datatype in Rust with a parent reference.
 
 ## Limitations
  This datatype has the following limitations:
-* Nodes in the tree can have duplicate values
+* Each Node is unique
 * A `Node` cannot have children of different types
+* not threadsafe
 
 ## Example
 ```rust norun ignore

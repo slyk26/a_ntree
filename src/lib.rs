@@ -1,3 +1,4 @@
+#![allow(rustdoc::invalid_codeblock_attributes)]
 #![doc = include_str!("../README.md")]
 
 use std::rc::{Rc, Weak};
@@ -139,7 +140,7 @@ impl<T> Node<T> where T: PartialEq {
         None
     }
 
-    /// removes a child [Node] from this Node
+    /// removes the first child [Node] from this Node
     /// ## Example
     /// ```
     /// use a_ntree::Node;
