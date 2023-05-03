@@ -11,12 +11,6 @@ pub struct Node<T> where T: PartialEq {
     pointer: Rc<RawNode<T>>,
 }
 
-impl<T> PartialEq for Node<T> where T: PartialEq {
-    fn eq(&self, other: &Self) -> bool {
-        Rc::ptr_eq(&self.pointer, &other.pointer)
-    }
-}
-
 #[allow(unused)]
 impl<T> Node<T> where T: PartialEq {
     /// creates a new [Node] with a value

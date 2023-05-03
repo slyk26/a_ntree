@@ -3,7 +3,7 @@ Simple Tree datatype in Rust with a parent reference.
 
 ## Limitations
  This datatype has the following limitations:
-* Each Node is unique
+* Each `Node` is unique
 * A `Node` cannot have children of different types
 * not threadsafe
 
