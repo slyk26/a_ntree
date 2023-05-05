@@ -1,5 +1,7 @@
-#![allow(rustdoc::invalid_codeblock_attributes)]
-#![doc = include_str!("../README.md")]
+#![cfg_attr(not(doctest), doc = include_str ! ("../README.md"))]
+#![warn(clippy::pedantic)]
+#![warn(clippy::nursery)]
+#![warn(clippy::cargo)]
 
 use std::rc::{Rc, Weak};
 use std::cell::{RefCell};
@@ -12,6 +14,7 @@ pub struct Node<T> where T: PartialEq {
 }
 
 impl<T> PartialEq for Node<T> where T: PartialEq {
+    #[inline]
     fn eq(&self, other: &Self) -> bool {
         Rc::ptr_eq(&self.pointer, &other.pointer)
     }
@@ -29,12 +32,12 @@ impl<T> Node<T> where T: PartialEq {
     /// assert_ne!(node, another_node);
     /// ```
     pub fn new(value: T) -> Self {
-        Node { pointer: Rc::new(RawNode::new(value)) }
+        Self { pointer: Rc::new(RawNode::new(value)) }
     }
 
-    /// internal method to get a [RawNode] as a [Node]
+    /// internal method to get a [`RawNode`] as a [`Node`]
     fn from(pointer: &Rc<RawNode<T>>) -> Self {
-        Node { pointer: Rc::clone(pointer) }
+        Self { pointer: Rc::clone(pointer) }
     }
 
     /// returns the value of a [Node] by reference
@@ -45,6 +48,7 @@ impl<T> Node<T> where T: PartialEq {
     ///
     /// assert_eq!(node.value(), &10)
     /// ```
+    #[must_use]
     pub fn value(&self) -> &T {
         self.pointer.value()
     }
@@ -62,9 +66,10 @@ impl<T> Node<T> where T: PartialEq {
     /// assert!(root.parent().is_none());
     /// assert_eq!(child.parent().unwrap(), root);
     /// ```
-    pub fn parent(&self) -> Option<Node<T>> {
+    #[must_use]
+    pub fn parent(&self) -> Option<Self> {
         if let Some(parent) = &self.pointer.parent.borrow().upgrade() {
-            return Some(Node::from(parent));
+            return Some(Self::from(parent));
         }
         None
     }
@@ -79,33 +84,39 @@ impl<T> Node<T> where T: PartialEq {
     ///
     /// assert_eq!(root.children().get(0).unwrap(), &child);
     /// assert_eq!(child.parent().unwrap(), root);
-    pub fn children(&self) -> Vec<Node<T>> {
-        let mut ret: Vec<Node<T>> = vec![];
+    #[must_use]
+    pub fn children(&self) -> Vec<Self> {
+        let mut ret: Vec<Self> = vec![];
 
         self.pointer.children.borrow().iter().for_each(|child| {
-            ret.push(Node::from(child));
+            ret.push(Self::from(child));
         });
 
         ret
     }
 
-    /// adds a child to a [Node]
+    /// adds a child to a [Node] if the child or any of its children are not in the tree
+    ///
+    /// returns true if it added, else false
     /// ## Example
     /// ```
     /// use a_ntree::Node;
     /// let root = Node::new(10);
     /// let child = Node::new(20);
-    /// root.add_child(&child);
+    /// let should_be_true = root.add_child(&child);
+    /// let should_be_false = root.add_child(&child);
     ///
-    /// assert_eq!(child.parent().unwrap(), root);
+    /// assert_eq!(should_be_true, true);
+    /// assert_eq!(should_be_false, false);
     /// ```
-    pub fn add_child(&self, child: &Node<T>) {
-        self.pointer.add_child(&child.pointer);
+    #[must_use]
+    pub fn add_child(&self, child: &Self) -> bool {
+        self.pointer.add_child(&child.pointer)
     }
 
-    /// adds a value directly as a child to a [Node]
+    /// adds a value directly as a child to a [`Node`]
     ///
-    /// same as [Node::add_child()] but without the need to create a new Node
+    /// same as [`Node::add_child()`] but without the need to create a new Node
     /// ## Example
     /// ```
     /// use a_ntree::Node;
@@ -114,8 +125,8 @@ impl<T> Node<T> where T: PartialEq {
     ///
     /// assert_eq!(root.children().get(0).unwrap().value(), &30);
     /// ```
-    pub fn add_leaf(&self, leaf: T) {
-        self.add_child(&Node::new(leaf));
+    pub fn add_leaf(&self, leaf: T) -> bool {
+        self.add_child(&Self::new(leaf))
     }
 
     /// searches a [Node] by value - starting from the calling Node inclusive
@@ -133,9 +144,9 @@ impl<T> Node<T> where T: PartialEq {
     /// assert_eq!(root.find(&10).unwrap().value(), &10);
     /// assert!(root.find(&999999).is_none());
     ///```
-    pub fn find(&self, value: &T) -> Option<Node<T>> {
-        if let Some(found) = self.pointer.find(&value) {
-            return Some(Node::from(&found));
+    pub fn find(&self, value: &T) -> Option<Self> {
+        if let Some(found) = self.pointer.find(value) {
+            return Some(Self::from(&found));
         }
         None
     }
@@ -154,8 +165,8 @@ impl<T> Node<T> where T: PartialEq {
     /// assert_eq!(root.children().len(), 1);
     /// assert!(root.find(&40).is_none());
     /// ```
-    pub fn remove_node(&self, value: &T) {
-        self.pointer.remove_node(value);
+    pub fn remove_node(&self, value: &T) -> Option<Self> {
+        self.pointer.remove_node(value).map(|raw_node| Self::from(&raw_node))
     }
 
     /// get the root [Node]
@@ -172,8 +183,9 @@ impl<T> Node<T> where T: PartialEq {
     ///
     /// assert_eq!(child_of_child.get_root(), root);
     /// ```
-    pub fn get_root(&self) -> Node<T> {
-        Node::from(&self.pointer.get_root())
+    #[must_use]
+    pub fn get_root(&self) -> Self {
+        Self::from(&self.pointer.get_root())
     }
 }
 
@@ -187,51 +199,83 @@ struct RawNode<T> where T: PartialEq {
 #[allow(unused)]
 impl<T> RawNode<T> where T: PartialEq {
     fn new(value: T) -> Self {
-        RawNode { value, parent: RefCell::new(Weak::new()), children: RefCell::new(vec![]) }
+        Self { value, parent: RefCell::new(Weak::new()), children: RefCell::new(vec![]) }
     }
 
-    fn value(&self) -> &T {
+    const fn value(&self) -> &T {
         &self.value
     }
 
-    fn parent(&self) -> Option<Rc<RawNode<T>>> {
+    fn parent(&self) -> Option<Rc<Self>> {
         self.parent.borrow().upgrade()
     }
 
-    fn children(&self) -> &RefCell<Vec<Rc<RawNode<T>>>> {
+    const fn children(&self) -> &RefCell<Vec<Rc<Self>>> {
         &self.children
     }
 
-    fn add_child(self: &Rc<Self>, child: &Rc<RawNode<T>>) {
-        self.children.borrow_mut().push(Rc::clone(child));
-        *child.parent.borrow_mut() = Rc::downgrade(self);
+    fn add_child(self: &Rc<Self>, child: &Rc<Self>) -> bool {
+        return if self.get_root().unique_nodes(child) {
+            self.children.borrow_mut().push(Rc::clone(child));
+            *child.parent.borrow_mut() = Rc::downgrade(self);
+            true
+        } else {
+            false
+        };
     }
 
-    fn find(self: &Rc<Self>, value: &T) -> Option<Rc<RawNode<T>>> {
+    fn find(self: &Rc<Self>, value: &T) -> Option<Rc<Self>> {
         if self.value() == value {
             Some(self.clone())
         } else {
-            self.children.borrow().iter().find_map(|node| RawNode::find(node, value))
+            self.children.borrow().iter().find_map(|node| Self::find(node, value))
         }
     }
 
-    fn remove_node(self: &Rc<Self>, value: &T) {
+    fn remove_node(self: &Rc<Self>, value: &T) -> Option<Rc<Self>> {
         if let Some(node) = self.find(value) {
             if let Some(parent) = node.parent.borrow().upgrade() {
                 let mut vec = parent.children.borrow_mut();
                 let idx = vec.iter().position(|node| node.value() == value).unwrap();
-                vec.remove(idx);
+                return Some(vec.remove(idx));
             }
+        }
+        None
+    }
+
+    fn get_root(self: &Rc<Self>) -> Rc<Self> {
+        return if self.parent().is_none() {
+            self.clone()
+        } else {
+            Self::get_root(&self.parent.borrow().upgrade().unwrap())
         }
     }
 
-    fn get_root(self: &Rc<Self>) -> Rc<RawNode<T>> {
-        let mut ret;
-        if self.parent().is_none() {
-            ret = self.clone()
-        } else {
-            ret = RawNode::get_root(&self.parent.borrow().upgrade().unwrap());
+    fn as_array(self: &Rc<Self>, mut elements: &mut Vec<Rc<Self>>, parent: &Rc<Self>) {
+        if self.parent().is_none() || (self.parent().is_some() && &self.parent().unwrap() == parent) {
+            elements.push(self.clone());
         }
-        ret
+
+        for child in self.children.borrow().iter() {
+            elements.push(child.clone());
+        }
+        self.children.borrow().iter().for_each(|child| Self::as_array(child, elements, parent));
+    }
+
+    fn unique_nodes(self: &Rc<Self>, other: &Rc<Self>) -> bool {
+        let mut my_nodes = vec![];
+        let mut other_nodes = vec![];
+        self.as_array(&mut my_nodes, self);
+        other.as_array(&mut other_nodes, self);
+        let my_values: Vec<&T> = my_nodes.iter().map(|n| n.value()).collect();
+        let other_values: Vec<&T> = other_nodes.iter().map(|n| n.value()).collect();
+
+        !other_values.iter().any(|o| my_values.contains(o))
+    }
+}
+
+impl<T> PartialEq for RawNode<T> where T: PartialEq {
+    fn eq(&self, other: &Self) -> bool {
+        self.value == other.value
     }
 }
