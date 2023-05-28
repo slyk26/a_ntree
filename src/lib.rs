@@ -1,11 +1,12 @@
-#![cfg_attr(not(doctest), doc = include_str ! ("../README.md"))]
+#![cfg_attr(not(doctest), doc = include_str!("../README.md"))]
 #![warn(clippy::pedantic)]
 #![warn(clippy::nursery)]
 #![warn(clippy::cargo)]
 
-use std::rc::{Rc, Weak};
-use std::cell::{RefCell};
+mod base;
+use std::rc::Rc;
 use std::fmt::Debug;
+use crate::base::RawNode;
 
 #[derive(Debug)]
 /// a singular Node that holds a generic value
@@ -88,7 +89,7 @@ impl<T> Node<T> where T: PartialEq {
     pub fn children(&self) -> Vec<Self> {
         let mut ret: Vec<Self> = vec![];
 
-        self.pointer.children.borrow().iter().for_each(|child| {
+        self.pointer.children().borrow().iter().for_each(|child| {
             ret.push(Self::from(child));
         });
 
@@ -151,7 +152,7 @@ impl<T> Node<T> where T: PartialEq {
         None
     }
 
-    /// removes the first child [Node] from this Node
+    /// removes the first child [Node] from this Node and all children
     /// ## Example
     /// ```
     /// use a_ntree::Node;
@@ -187,95 +188,15 @@ impl<T> Node<T> where T: PartialEq {
     pub fn get_root(&self) -> Self {
         Self::from(&self.pointer.get_root())
     }
-}
 
-#[derive(Debug)]
-struct RawNode<T> where T: PartialEq {
-    value: T,
-    parent: RefCell<Weak<RawNode<T>>>,
-    children: RefCell<Vec<Rc<RawNode<T>>>>,
-}
-
-#[allow(unused)]
-impl<T> RawNode<T> where T: PartialEq {
-    fn new(value: T) -> Self {
-        Self { value, parent: RefCell::new(Weak::new()), children: RefCell::new(vec![]) }
-    }
-
-    const fn value(&self) -> &T {
-        &self.value
-    }
-
-    fn parent(&self) -> Option<Rc<Self>> {
-        self.parent.borrow().upgrade()
-    }
-
-    const fn children(&self) -> &RefCell<Vec<Rc<Self>>> {
-        &self.children
-    }
-
-    fn add_child(self: &Rc<Self>, child: &Rc<Self>) -> bool {
-        return if self.get_root().unique_nodes(child) {
-            self.children.borrow_mut().push(Rc::clone(child));
-            *child.parent.borrow_mut() = Rc::downgrade(self);
-            true
-        } else {
-            false
-        };
-    }
-
-    fn find(self: &Rc<Self>, value: &T) -> Option<Rc<Self>> {
-        if self.value() == value {
-            Some(self.clone())
-        } else {
-            self.children.borrow().iter().find_map(|node| Self::find(node, value))
-        }
-    }
-
-    fn remove_node(self: &Rc<Self>, value: &T) -> Option<Rc<Self>> {
-        if let Some(node) = self.find(value) {
-            if let Some(parent) = node.parent.borrow().upgrade() {
-                let mut vec = parent.children.borrow_mut();
-                let idx = vec.iter().position(|node| node.value() == value).unwrap();
-                return Some(vec.remove(idx));
-            }
-        }
-        None
-    }
-
-    fn get_root(self: &Rc<Self>) -> Rc<Self> {
-        return if self.parent().is_none() {
-            self.clone()
-        } else {
-            Self::get_root(&self.parent.borrow().upgrade().unwrap())
-        }
-    }
-
-    fn as_array(self: &Rc<Self>, mut elements: &mut Vec<Rc<Self>>, parent: &Rc<Self>) {
-        if self.parent().is_none() || (self.parent().is_some() && &self.parent().unwrap() == parent) {
-            elements.push(self.clone());
-        }
-
-        for child in self.children.borrow().iter() {
-            elements.push(child.clone());
-        }
-        self.children.borrow().iter().for_each(|child| Self::as_array(child, elements, parent));
-    }
-
-    fn unique_nodes(self: &Rc<Self>, other: &Rc<Self>) -> bool {
-        let mut my_nodes = vec![];
-        let mut other_nodes = vec![];
-        self.as_array(&mut my_nodes, self);
-        other.as_array(&mut other_nodes, self);
-        let my_values: Vec<&T> = my_nodes.iter().map(|n| n.value()).collect();
-        let other_values: Vec<&T> = other_nodes.iter().map(|n| n.value()).collect();
-
-        !other_values.iter().any(|o| my_values.contains(o))
-    }
-}
-
-impl<T> PartialEq for RawNode<T> where T: PartialEq {
-    fn eq(&self, other: &Self) -> bool {
-        self.value == other.value
+    /// gets the number of strong pointers of this Node
+    /// ```
+    /// use a_ntree::Node;
+    /// let root = Node::new(10);
+    /// assert_eq!(root.rc_count(), 1);
+    /// ```
+    #[must_use]
+    pub fn rc_count(&self) -> usize  {
+     Rc::strong_count(&self.pointer)
     }
 }

@@ -5,7 +5,7 @@ Simple Tree datatype in Rust with a parent reference.
  This datatype has the following limitations:
 * Each `Node` is unique
 * A `Node` cannot have children of different types
-* not threadsafe - internally `Rc` is used 
+* not threadsafe 
 
 ## Example
 ```rust
